@@ -183,8 +183,12 @@ cp -a "${TMP_DIR}/wordpress/." "${WP_TARGET_DIR}/"
 
 echo "==> Removing unnecessary public files..."
 rm -f "${WP_TARGET_DIR}/readme.html" \
-      "${WP_TARGET_DIR}/license.txt" \
-      "${WP_TARGET_DIR}/wp-config-sample.php" || true
+      "${WP_TARGET_DIR}/license.txt" || true
+
+# Only remove wp-config-sample.php when doing CORE-only updates
+if [[ "${MODE}" == "core" ]]; then
+  rm -f "${WP_TARGET_DIR}/wp-config-sample.php" || true
+fi
 
 
 echo
