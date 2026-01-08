@@ -3,8 +3,7 @@ set -euo pipefail
 
 # ------------------------------------------------------------
 # Interactive WordPress latest installer/updater
-# - Asks what you want to do
-# - Safe defaults
+# Auto-detects empty folder -> proposes full install by default
 # ------------------------------------------------------------
 
 WP_TARGET_DIR="${WP_TARGET_DIR:-$(pwd)}"
@@ -24,16 +23,36 @@ echo "=============================="
 echo "Target directory: ${WP_TARGET_DIR}"
 echo
 
-# Check if it's an existing WP install (basic)
-IS_EXISTING="0"
-if [[ -f "${WP_TARGET_DIR}/wp-config.php" || -d "${WP_TARGET_DIR}/wp-content" ]]; then
-  IS_EXISTING="1"
+# --- Detection logic ---
+# Folder is considered "existing WP" if ANY of these exist
+# (we keep it simple but reliable)
+HAS_WP_CONFIG="0"
+HAS_WP_CONTENT="0"
+HAS_WP_CORE="0"
+
+[[ -f "${WP_TARGET_DIR}/wp-config.php" ]] && HAS_WP_CONFIG="1"
+[[ -d "${WP_TARGET_DIR}/wp-content" ]] && HAS_WP_CONTENT="1"
+
+# core indicators
+if [[ -f "${WP_TARGET_DIR}/wp-settings.php" || -d "${WP_TARGET_DIR}/wp-admin" || -d "${WP_TARGET_DIR}/wp-includes" ]]; then
+  HAS_WP_CORE="1"
 fi
 
-if [[ "${IS_EXISTING}" == "1" ]]; then
-  echo "Detected: existing WordPress install (wp-config.php and/or wp-content found)."
+# "empty" = no config, no content, no core
+IS_EMPTY="0"
+if [[ "${HAS_WP_CONFIG}" == "0" && "${HAS_WP_CONTENT}" == "0" && "${HAS_WP_CORE}" == "0" ]]; then
+  IS_EMPTY="1"
+fi
+
+# default choice: empty -> full install, existing -> core
+DEFAULT_CHOICE="1"
+if [[ "${IS_EMPTY}" == "1" ]]; then
+  DEFAULT_CHOICE="2"
+  echo "Detected: empty folder (no WordPress core/wp-content/wp-config found)."
+  echo "Suggestion: FULL install (option 2)."
 else
-  echo "Detected: empty or non-standard folder (no wp-config/wp-content found)."
+  echo "Detected: existing WordPress install (core/wp-content/wp-config found)."
+  echo "Suggestion: CORE update (option 1) to keep wp-content + wp-config."
 fi
 
 echo
@@ -44,7 +63,8 @@ echo "  3) Full overwrite (copy everything incl. wp-content + wp-config)        
 echo "  4) Cancel"
 echo
 
-read -r -p "Enter choice [1-4]: " CHOICE
+read -r -p "Enter choice [1-4] (default: ${DEFAULT_CHOICE}): " CHOICE
+CHOICE="${CHOICE:-$DEFAULT_CHOICE}"
 
 case "${CHOICE}" in
   1) MODE="core" ;;
@@ -83,18 +103,20 @@ if [[ ! -d "${TMP_DIR}/wordpress" ]]; then
   exit 1
 fi
 
-# Mode behaviors
+# --- Mode behaviors ---
 if [[ "${MODE}" == "core" ]]; then
   echo "==> CORE mode: keep wp-content + wp-config.php"
   rm -rf "${TMP_DIR}/wordpress/wp-content"
   rm -f  "${TMP_DIR}/wordpress/wp-config.php" || true
+
 elif [[ "${MODE}" == "install" ]]; then
   echo "==> INSTALL mode: copy everything incl. wp-content"
-  # Still: protect existing wp-config.php
+  # protect existing wp-config.php
   if [[ -f "${WP_TARGET_DIR}/wp-config.php" ]]; then
     echo "==> Existing wp-config.php found - will not overwrite."
     rm -f "${TMP_DIR}/wordpress/wp-config.php" || true
   fi
+
 elif [[ "${MODE}" == "overwrite" ]]; then
   echo "==> OVERWRITE mode: overwrite everything (incl. wp-content + wp-config.php)"
 fi
