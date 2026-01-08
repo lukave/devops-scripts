@@ -180,6 +180,8 @@ fi
 
 echo "==> Copying files..."
 cp -a "${TMP_DIR}/wordpress/." "${WP_TARGET_DIR}/"
+echo "==> Removing unnecessary public files (readme.html, license.txt)..."
+rm -f "${WP_TARGET_DIR}/readme.html" "${WP_TARGET_DIR}/license.txt" || true
 
 echo
 echo "✅ Done!"
